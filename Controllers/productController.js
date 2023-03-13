@@ -1,4 +1,5 @@
 const productModel = require('../Models/productModel');
+const validator = require('../Validator/validator');
 
 
 const createProduct = async function (req, res) {
@@ -34,14 +35,16 @@ const createProduct = async function (req, res) {
 const getProducts = async function (req, res) {
     try {
 
-        const { name, category, price } = req.query;
+        const { name, category, price, page, limit } = req.query;
+        let skip = (page - 1) * limit;
 
-        if (Object.keys(req.query).length === 0) {
+        if (page && limit) {
 
-            const allProducts = await productModel.find().select({ name: 1, category: 1, price: 1, _id: 0 });
+            const allProducts = await productModel.find().select({ name: 1, category: 1, price: 1, _id: 0 }).limit(limit).skip(skip);
             return res.status(200).send({ status: true, message: "All products....keep shopping!", data: allProducts });
 
         } else {
+
 
             let filter = {};
 
@@ -57,8 +60,6 @@ const getProducts = async function (req, res) {
                 filter = { name, price };
             } else if (category && price) {
                 filter = (category, price)
-            } else {
-                return res.status(400).send({ status: false, message: "Please give valid queries" })
             }
 
 
@@ -77,22 +78,17 @@ const getProducts = async function (req, res) {
 
     }
 }
-const getProductById = async function (req, res) {
 
-    try {
-
-
-
-    } catch (error) {
-
-        return res.status(500).send({ status: false, message: error.message })
-
-    }
-}
 
 const updateProduct = async function (req, res) {
     try {
-        productId = req.params.productId;
+        let productId = req.params.productId;
+
+        let validId = validator.isValidObjectId(productId);
+        if (!validId) {
+            return res.status(400).send({ status: false, message: "Please give valid productId" })
+        }
+
         const data = req.body;
         const { name, description, category, price } = data;
 
@@ -105,7 +101,7 @@ const updateProduct = async function (req, res) {
         }
 
         const updatedProduct = await productModel.findOneAndUpdate({ _id: productId, isDeleted: false }, data, { new: true });
-        console.log(updatedProduct);
+        //console.log(updatedProduct);
 
         return res.status(200).send({ status: true, message: "Product updated", data: updatedProduct });
     } catch (error) {
@@ -114,10 +110,19 @@ const updateProduct = async function (req, res) {
     }
 }
 
+
 const deleteProduct = async function (req, res) {
     try {
-        const productId = req.params.productId;
+        let productId = req.params.productId;
+        let validId = validator.isValidObjectId(productId);
+        if (!validId) {
+            return res.status(400).send({ status: false, message: "Please give valid productId" })
 
+        }
+        let deletedProduct = await productModel.findOne({ _id: productId, isDeleted: true });
+        if (deletedProduct) {
+            return res.status(400).send({ status: false, message: "Product already deleted" });
+        }
         let productToBeDeleted = await productModel.findById(productId)
         if (!productToBeDeleted) return res.status(404).send({ status: false, msg: "Data not found" });
         if (productToBeDeleted.isDeleted === false) {
@@ -132,6 +137,5 @@ const deleteProduct = async function (req, res) {
 
 module.exports.createProduct = createProduct;
 module.exports.getProducts = getProducts;
-module.exports.getProductById = getProductById;
 module.exports.updateProduct = updateProduct;
 module.exports.deleteProduct = deleteProduct;
